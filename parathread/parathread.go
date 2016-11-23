@@ -33,6 +33,15 @@ func (n *Node) Run(f func(n *Node)) {
 	n.Executed.Done()
 }
 
+func (n *Node) HasDep(m *Node) bool {
+	for _, d := range n.Deps {
+		if d.Key == m.Key {
+			return true
+		}
+	}
+	return false
+}
+
 type MapNodes map[string]*Node
 
 func (m MapNodes) String() string {
@@ -125,18 +134,56 @@ func (t *Thread) Run(f func(n *Node)) {
 	}
 }
 
-func (t *Thread) RebuildFromRegexp(pattern string) *Thread {
+func (t *Thread) RebuildToRegexp(pattern string) *Thread {
 	if !t.Closed {
 		t.Prepare()
 	}
 	nt := NewThread()
+	nt.logger = t.logger
 	for k := range t.Map {
 		matched, err := regexp.MatchString(pattern, k)
 		if err != nil {
 			log.Fatal(err)
 		}
 		if matched {
-			nt.RecBuildFromNode(t.Map[k])
+			nt.RecBuildToNode(t.Map[k])
+		}
+	}
+	nt.Prepare()
+	return nt
+}
+
+func (t *Thread) RebuildToKey(k string) *Thread {
+	if !t.Closed {
+		t.Prepare()
+	}
+	nt := NewThread()
+	nt.logger = t.logger
+	nt.RecBuildToNode(t.Map[k])
+	nt.Prepare()
+	return nt
+}
+
+func (t *Thread) RecBuildToNode(n *Node) {
+	t.Add(n.Key, n.KeyDeps)
+	for _, c := range n.Deps {
+		t.RecBuildToNode(c)
+	}
+}
+
+func (t *Thread) RebuildFromRegexp(pattern string) *Thread {
+	if !t.Closed {
+		t.Prepare()
+	}
+	nt := NewThread()
+	nt.logger = t.logger
+	for k := range t.Map {
+		matched, err := regexp.MatchString(pattern, k)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if matched {
+			nt.RecBuildFromNode(t.Map, t.Map[k])
 		}
 	}
 	nt.Prepare()
@@ -148,15 +195,18 @@ func (t *Thread) RebuildFromKey(k string) *Thread {
 		t.Prepare()
 	}
 	nt := NewThread()
-	nt.RecBuildFromNode(t.Map[k])
+	nt.logger = t.logger
+	nt.RecBuildFromNode(t.Map, t.Map[k])
 	nt.Prepare()
 	return nt
 }
 
-func (t *Thread) RecBuildFromNode(n *Node) {
+func (t *Thread) RecBuildFromNode(m MapNodes, n *Node) {
 	t.Add(n.Key, n.KeyDeps)
-	for _, c := range n.Deps {
-		t.RecBuildFromNode(c)
+	for _, c := range m {
+		if c.HasDep(n) {
+			t.RecBuildFromNode(m, c)
+		}
 	}
 }
 
