@@ -1,6 +1,7 @@
 package firelog
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -13,5 +14,12 @@ func TestFirebase(t *testing.T) {
 	logs := NewFirebaseService(endpoint, authToken, ref)
 	logs.Deamon()
 	logs.Push(NewFirebaseMessage("k", "c"))
+	logs.Push(NewFirebaseMessage("coucou", "c"))
+	logs.Push(NewFirebaseMessage("coucou", "d"))
+	logs.Push(NewFirebaseMessage("coucou", "e"))
+	logs.Push(NewFirebaseMessage("coucou", "f"))
+	logs.Push(NewFirebaseMessage("coucou", "g"))
+	logs.Push(NewFirebaseMessage("coucou", "h"))
+	logs.Push(NewFirebaseMessage("coucou", "i"))
 	logs.Wait()
 }

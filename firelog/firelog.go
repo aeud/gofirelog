@@ -7,10 +7,6 @@ import (
 	"sync"
 )
 
-const (
-	concurrentWriter int = 10
-)
-
 type FirebaseMessage struct {
 	key     string
 	message string
@@ -48,9 +44,7 @@ func (s *FirebaseService) Run() {
 }
 
 func (s *FirebaseService) Deamon() {
-	for i := 0; i < concurrentWriter; i++ {
-		go s.Run()
-	}
+	go s.Run()
 }
 
 func (s *FirebaseService) Write(m *FirebaseMessage) {
