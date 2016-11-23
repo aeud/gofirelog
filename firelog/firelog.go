@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	concurrentWriter int32 = 10
+	concurrentWriter int = 10
 )
 
 type FirebaseMessage struct {
