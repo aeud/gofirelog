@@ -65,6 +65,13 @@ func (s *FirebaseService) Push(m *FirebaseMessage) {
 	s.stack <- m
 }
 
+func (s *FirebaseService) AsyncPush(m *FirebaseMessage) {
+	s.wg.Add(1)
+	go func(s *FirebaseService) {
+		s.stack <- m
+	}(s)
+}
+
 func (s *FirebaseService) Wait() {
 	s.wg.Wait()
 }
