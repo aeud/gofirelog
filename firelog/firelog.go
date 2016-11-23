@@ -52,9 +52,11 @@ func (s *FirebaseService) Write(m *FirebaseMessage) {
 	f := firego.New(url, nil)
 	f.Auth(s.authToken)
 	v := m.message
-	if err := f.Set(v); err != nil {
-		log.Fatalln(err)
-	}
+	go func() {
+		if err := f.Set(v); err != nil {
+			log.Fatalln(err)
+		}
+	}()
 	s.wg.Done()
 }
 

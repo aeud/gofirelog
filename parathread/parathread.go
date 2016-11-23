@@ -2,6 +2,7 @@ package parathread
 
 import (
 	"fmt"
+	"github.com/aeud/goutils/firelog"
 	"log"
 	"regexp"
 	"strings"
@@ -50,6 +51,7 @@ type Thread struct {
 	Closed bool
 	Map    MapNodes
 	wg     *sync.WaitGroup
+	logger *firelog.FirebaseService
 }
 
 func NewThread() *Thread {
@@ -58,6 +60,17 @@ func NewThread() *Thread {
 	t.Map = make(MapNodes)
 	t.wg = new(sync.WaitGroup)
 	return t
+}
+
+func (t *Thread) AddLogger(endpoint, authToken, ref string) {
+	t.logger = firelog.NewFirebaseService(endpoint, authToken, ref)
+	t.logger.Deamon()
+}
+
+func (t *Thread) Log(k, c string) {
+	if t.logger != nil {
+		t.logger.Push(firelog.NewFirebaseMessage(k, c))
+	}
 }
 
 func (t *Thread) String() string {
@@ -99,12 +112,17 @@ func (t *Thread) Prepare() {
 func (t *Thread) Run(f func(n *Node)) {
 	for _, n := range t.Map {
 		t.wg.Add(1)
+		t.Log(n.Key, "pending...")
 		go func(n *Node, wg *sync.WaitGroup) {
 			n.Run(f)
+			t.Log(n.Key, "done")
 			wg.Done()
 		}(n, t.wg)
 	}
 	t.wg.Wait()
+	if t.logger != nil {
+		t.logger.Wait()
+	}
 }
 
 func (t *Thread) RebuildFromRegexp(pattern string) *Thread {
