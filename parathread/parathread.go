@@ -113,11 +113,11 @@ func (t *Thread) Run(f func(n *Node)) {
 	for _, n := range t.Map {
 		t.wg.Add(1)
 		t.Log(n.Key, "pending...")
-		go func(n *Node, wg *sync.WaitGroup) {
+		go func(n *Node, t *Thread) {
 			n.Run(f)
 			t.Log(n.Key, "done")
-			wg.Done()
-		}(n, t.wg)
+			t.wg.Done()
+		}(n, t)
 	}
 	t.wg.Wait()
 	if t.logger != nil {
