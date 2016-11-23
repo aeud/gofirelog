@@ -49,7 +49,7 @@ func (s *FirebaseService) Deamon() {
 }
 
 func (s *FirebaseService) Write(m *FirebaseMessage) {
-	url := fmt.Sprintf("%v/%v/%v", s.endpoint, s.ref, strings.Replace(m.key, ".", "/", 0))
+	url := fmt.Sprintf("%v/%v/%v", s.endpoint, s.ref, strings.Replace(m.key, ".", "/", -1))
 	f := firego.New(url, nil)
 	f.Auth(s.authToken)
 	v := m.message
