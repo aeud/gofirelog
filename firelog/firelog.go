@@ -4,6 +4,7 @@ import (
 	"fmt"
 	firego "gopkg.in/zabawaba99/firego.v1"
 	"log"
+	"strings"
 	"sync"
 )
 
@@ -48,7 +49,7 @@ func (s *FirebaseService) Deamon() {
 }
 
 func (s *FirebaseService) Write(m *FirebaseMessage) {
-	url := fmt.Sprintf("%v/%v/%v", s.endpoint, s.ref, m.key)
+	url := fmt.Sprintf("%v/%v/%v", s.endpoint, s.ref, strings.Replace(m.key, ".", "/", 0))
 	f := firego.New(url, nil)
 	f.Auth(s.authToken)
 	v := m.message
