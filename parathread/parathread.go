@@ -69,7 +69,9 @@ func (t *Thread) AddLogger(endpoint, authToken, ref string) {
 
 func (t *Thread) Log(k, c string) {
 	if t.logger != nil {
-		t.logger.Push(firelog.NewFirebaseMessage(k, c))
+		go func() {
+			t.logger.Push(firelog.NewFirebaseMessage(k, c))
+		}()
 	}
 }
 
