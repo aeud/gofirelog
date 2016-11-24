@@ -22,8 +22,9 @@ func TestStructure(t *testing.T) {
 		ref := time.Now().Format("2006-01-02T15:04:05")
 		th.AddLogger(endpoint, authToken, ref)
 	}
-	th.Run(func(n *Node) {
+	th.Run(func(n *Node) error {
 		fmt.Println(n.Key)
+		return nil
 	})
 }
 
@@ -40,8 +41,9 @@ func TestRebuild(t *testing.T) {
 	// fmt.Println(th.RebuildFromKey("bar"))
 	// fmt.Println(th.RebuildFromRegexp("bar.*"))
 	newTh := th.RebuildFromRegexp("bar.*")
-	newTh.Run(func(n *Node) {
+	newTh.Run(func(n *Node) error {
 		// fmt.Println(n.Key)
+		return nil
 	})
 }
 

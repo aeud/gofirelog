@@ -25,12 +25,13 @@ func newNode(k string, ks []string) *Node {
 	return n
 }
 
-func (n *Node) Run(f func(n *Node)) {
+func (n *Node) Run(f func(n *Node) error) error {
 	for _, c := range n.Deps {
 		c.Executed.Wait()
 	}
-	f(n)
+	err := f(n)
 	n.Executed.Done()
+	return err
 }
 
 func (n *Node) HasDep(m *Node) bool {
@@ -118,13 +119,18 @@ func (t *Thread) Prepare() {
 	}
 }
 
-func (t *Thread) Run(f func(n *Node)) {
+func (t *Thread) Run(f func(n *Node) error) {
 	for _, n := range t.Map {
 		t.wg.Add(1)
 		t.Log(n.Key, "pending...")
 		go func(n *Node, t *Thread) {
-			n.Run(f)
-			t.Log(n.Key, "done")
+			err := n.Run(f)
+			if err == nil {
+				t.Log(n.Key, "done")
+			} else {
+				t.Log(n.Key, fmt.Sprintf("%v", err))
+			}
+
 			t.wg.Done()
 		}(n, t)
 	}
