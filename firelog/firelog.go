@@ -55,7 +55,7 @@ func (s *FirebaseService) Write(m *FirebaseMessage) {
 	v := m.message
 	log.Printf("Log %v: %v\n", url, v)
 	if err := f.Set(v); err != nil {
-		log.Fatalln(err)
+		log.Fatalf("Firebase Auth: %v\n", err)
 	}
 	s.wg.Done()
 }
