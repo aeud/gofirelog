@@ -20,6 +20,10 @@ func NewFirebaseMessage(k, c string) *FirebaseMessage {
 	return m
 }
 
+func (m *FirebaseMessage) Output() {
+	log.Printf("Log %v: %v\n", strings.Replace(m.key, ".", "/", -1), m.message)
+}
+
 type FirebaseService struct {
 	stack     chan *FirebaseMessage
 	wg        *sync.WaitGroup
@@ -53,7 +57,7 @@ func (s *FirebaseService) Write(m *FirebaseMessage) {
 	f := firego.New(url, nil)
 	f.Auth(s.authToken)
 	v := m.message
-	log.Printf("Log %v: %v\n", url, v)
+	// log.Printf("Log %v: %v\n", url, v)
 	if err := f.Set(v); err != nil {
 		log.Fatalf("Firebase Auth: %v\n", err)
 	}
@@ -66,6 +70,7 @@ func (s *FirebaseService) Push(m *FirebaseMessage) {
 }
 
 func (s *FirebaseService) AsyncPush(m *FirebaseMessage) {
+	m.Output()
 	s.wg.Add(1)
 	go func(s *FirebaseService) {
 		s.stack <- m

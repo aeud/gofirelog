@@ -7,6 +7,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	dryTimeout time.Duration = 2
 )
 
 type Node struct {
@@ -14,24 +19,47 @@ type Node struct {
 	KeyDeps  []string
 	Deps     []*Node
 	Executed *sync.WaitGroup
+	Function func() error
 }
 
-func newNode(k string, ks []string) *Node {
+func newNode(k string, ks []string, f func() error) *Node {
 	n := new(Node)
 	n.Key = k
 	n.KeyDeps = ks
 	n.Executed = new(sync.WaitGroup)
 	n.Executed.Add(1)
+	n.Function = f
 	return n
 }
 
-func (n *Node) Run(f func(n *Node) error) error {
-	for _, c := range n.Deps {
-		c.Executed.Wait()
-	}
-	err := f(n)
-	n.Executed.Done()
-	return err
+func (n *Node) Run() (chan bool, chan error) {
+	armed := make(chan bool)
+	res := make(chan error)
+	go func() {
+		for _, c := range n.Deps {
+			c.Executed.Wait()
+		}
+		armed <- true
+		err := n.Function()
+		n.Executed.Done()
+		res <- err
+	}()
+	return armed, res
+}
+
+func (n *Node) DryRun() (chan bool, chan error) {
+	armed := make(chan bool)
+	res := make(chan error)
+	go func() {
+		for _, c := range n.Deps {
+			c.Executed.Wait()
+		}
+		armed <- true
+		time.Sleep(dryTimeout * time.Second)
+		n.Executed.Done()
+		res <- nil
+	}()
+	return armed, res
 }
 
 func (n *Node) HasDep(m *Node) bool {
@@ -83,6 +111,10 @@ func (t *Thread) Log(k, c string) {
 	}
 }
 
+func (t *Thread) DryLog(k, c string) {
+	log.Printf("Dry log - %v: %v\n", k, c)
+}
+
 func (t *Thread) String() string {
 	layout := `
 Length: %v
@@ -92,9 +124,17 @@ Keys: %v
 	return fmt.Sprintf(layout, len(t.Map), t.Closed, t.Map)
 }
 
-func (t *Thread) Add(k string, ks []string) {
+func (t *Thread) Add(k string, ks []string, f func() error) {
 	if !t.Closed {
-		t.Map[k] = newNode(k, ks)
+		t.Map[k] = newNode(k, ks, f)
+	} else {
+		panic("Closed thread")
+	}
+}
+
+func (t *Thread) AddNode(n *Node) {
+	if !t.Closed {
+		t.Map[n.Key] = n
 	} else {
 		panic("Closed thread")
 	}
@@ -119,18 +159,45 @@ func (t *Thread) Prepare() {
 	}
 }
 
-func (t *Thread) Run(f func(n *Node) error) {
+func (t *Thread) Run() {
+	t.Prepare()
 	for _, n := range t.Map {
 		t.wg.Add(1)
 		t.Log(n.Key, "pending...")
 		go func(n *Node, t *Thread) {
-			err := n.Run(f)
-			if err == nil {
-				t.Log(n.Key, "done")
+			armed, res := n.Run()
+			<-armed
+			start := time.Now()
+			t.Log(n.Key, fmt.Sprintf("executing... (start: %v)", start))
+			if err := <-res; err == nil {
+				t.Log(n.Key, fmt.Sprintf("done (start: %v, end: %v, duration: %v)", start, time.Now(), time.Since(start)))
 			} else {
 				t.Log(n.Key, fmt.Sprintf("%v", err))
 			}
+			t.wg.Done()
+		}(n, t)
+	}
+	t.wg.Wait()
+	if t.logger != nil {
+		t.logger.Wait()
+	}
+}
 
+func (t *Thread) DryRun() {
+	t.Prepare()
+	for _, n := range t.Map {
+		t.wg.Add(1)
+		t.DryLog(n.Key, "pending...")
+		go func(n *Node, t *Thread) {
+			armed, res := n.DryRun()
+			<-armed
+			start := time.Now()
+			t.DryLog(n.Key, fmt.Sprintf("executing... (start: %v)", start))
+			if err := <-res; err == nil {
+				t.DryLog(n.Key, fmt.Sprintf("done (start: %v, end: %v, duration: %v)", start, time.Now(), time.Since(start)))
+			} else {
+				t.DryLog(n.Key, fmt.Sprintf("failed (%v)", err))
+			}
 			t.wg.Done()
 		}(n, t)
 	}
@@ -171,7 +238,7 @@ func (t *Thread) RebuildToKey(k string) *Thread {
 }
 
 func (t *Thread) RecBuildToNode(n *Node) {
-	t.Add(n.Key, n.KeyDeps)
+	t.Add(n.Key, n.KeyDeps, n.Function)
 	for _, c := range n.Deps {
 		t.RecBuildToNode(c)
 	}
@@ -208,12 +275,24 @@ func (t *Thread) RebuildFromKey(k string) *Thread {
 }
 
 func (t *Thread) RecBuildFromNode(m MapNodes, n *Node) {
-	t.Add(n.Key, n.KeyDeps)
+	t.Add(n.Key, n.KeyDeps, n.Function)
 	for _, c := range m {
 		if c.HasDep(n) {
 			t.RecBuildFromNode(m, c)
 		}
 	}
+}
+
+func (t *Thread) ExcludeKeys(pattern string) *Thread {
+	r := regexp.MustCompile(pattern)
+	nt := NewThread()
+	nt.logger = t.logger
+	for key, node := range t.Map {
+		if !r.MatchString(key) {
+			nt.AddNode(node)
+		}
+	}
+	return nt
 }
 
 func removeDuplicate(a []string) []string {
